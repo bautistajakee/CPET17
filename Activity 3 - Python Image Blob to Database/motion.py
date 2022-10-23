@@ -3,8 +3,9 @@ import requests
 import cv2  
 from datetime import datetime 
 import os 
+import base64
 
-dir_path = os.path.dirname(os.path.realpath(__file__))
+path = os.path.dirname(os.path.realpath(__file__))
 
 initialState = None  
 motionTrackList= [ None, None ]  
@@ -12,14 +13,15 @@ motionTime = []
 dataFrame = panda.DataFrame(columns = ["Initial", "Final"])
 video = cv2.VideoCapture(0)  
 
-frame_width = int(video.get(3))
-frame_height = int(video.get(4))
+#setup video capture
+#frame_width = int(video.get(3))
+#frame_height = int(video.get(4))
 
-video_cod = cv2.VideoWriter_fourcc(*'XVID')
-video_output= cv2.VideoWriter('captured_video.avi',
-                      video_cod,
-                      30,
-                      (frame_width,frame_height))
+#video_cod = cv2.VideoWriter_fourcc(*'XVID')
+#video_output= cv2.VideoWriter('captured_video.avi',
+#                      video_cod,
+#                      30,
+#                      (frame_width,frame_height))
 
 while True:  
 
@@ -35,7 +37,7 @@ while True:
 
    differ_frame = cv2.absdiff(initialState, gray_frame)  
 
-   thresh_frame = cv2.threshold(differ_frame, 35, 255, cv2.THRESH_BINARY)[1]  
+   thresh_frame = cv2.threshold(differ_frame, 40, 175, cv2.THRESH_BINARY)[1]  
    thresh_frame = cv2.dilate(thresh_frame, None, iterations = 2)  
 
    cont,_ = cv2.findContours(thresh_frame.copy(),   
@@ -51,29 +53,39 @@ while True:
 
    motionTrackList.append(var_motion)  
    motionTrackList = motionTrackList[-2:]
-
-   if check == True and var_motion == 1: 
-       video_output.write(cur_frame) 
+   
+   
+   #if check == True and var_motion == 1: 
+       #video_output.write(cur_frame) 
+       #print(str(dir_path) + '\capimage.png')
+       #cv2.imwrite(str(dir_path) + '\capimage.png',cur_frame)
        #res = requests.post('http://127.0.0.1:3000/cap')
        #print(__dir) 
-
+    
+   #capture video if motion
    if motionTrackList[-1] == 1 and motionTrackList[-2] == 0:  
        motionTime.append(datetime.now()) 
-       print('START: '+str(datetime.now()))
-       
-#****************************************************************************       
-       #array = {'time':str(datetime.now())}
-       #data = {'array':array}
-       #res = requests.post('http://127.0.0.1:3000/time', json=data)
-#****************************************************************************       
+       start_time = str(datetime.now())
+       print('START: '+ start_time)
+       cv2.imwrite(str(path) + '\capimage.png',cur_frame)      
 
+   #send video capture and datetime to nodejs
    if motionTrackList[-1] == 0 and motionTrackList[-2] == 1:  
        motionTime.append(datetime.now())  
        print('END: '+str(datetime.now()))
-       array = {'time':str(datetime.now())}
+       file = open('capimage.png','rb').read()
+       file = base64.b64encode(file)
+       #with open('capimage.png', 'rb') as file:
+       # file = base64.b64encode(file.read())
+       file = file.decode('utf-8')
+
+       array = {
+        'time':start_time,
+        'vid':file
+       }
        data = {'array':array}
        res = requests.post('http://127.0.0.1:3000/cap', json=data)
-       #break
+       
    cv2.imshow("The image captured in the Gray Frame is shown below: ", gray_frame)  
    cv2.imshow("Difference between the  inital static frame and the current frame: ", differ_frame)  
    cv2.imshow("Threshold Frame created from the PC or Laptop Webcam is: ", thresh_frame)  
